@@ -1,0 +1,2 @@
+# /etc/exports  (rpi5-login)
+/clusterfs 10.0.0.0/24(rw,sync,no_subtree_check)

@@ -1,0 +1,8 @@
+# job output and build artifacts
+*.out
+workloads/mc_pi_gpu
+__pycache__/
+
+# never commit secrets
+munge.key
+*.key

@@ -1,0 +1,4 @@
+# Append to /etc/hosts on BOTH nodes.
+# Also comment out the "127.0.1.1 <hostname>" line on each node.
+10.0.0.1   rpi5-login
+10.0.0.11  orin-node01

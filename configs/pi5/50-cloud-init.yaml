@@ -1,0 +1,25 @@
+# /etc/netplan/50-cloud-init.yaml  (rpi5-login)
+# Wi-Fi = internet for the cluster. eth0 DHCP is only for the laptop-cable (ICS) phase;
+# 60-cluster.yaml overrides eth0 to a static 10.0.0.1 in Part 2.
+# Placeholders only: never commit real passwords.
+# Apply with: sudo chmod 600 /etc/netplan/*.yaml && sudo netplan try
+network:
+  version: 2
+  ethernets:
+    eth0:
+      optional: true
+      dhcp4: true
+  wifis:
+    wlan0:
+      optional: true
+      dhcp4: true
+      regulatory-domain: "SG"
+      access-points:
+        "YOUR_SSID":
+          auth:
+            key-management: "psk"
+            password: "YOUR_WIFI_PASSWORD"
+        "YOUR_PHONE_HOTSPOT":
+          auth:
+            key-management: "psk"
+            password: "YOUR_HOTSPOT_PASSWORD"
