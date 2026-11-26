@@ -72,6 +72,7 @@ ssh orin-node01 sudo tail -n 30 /var/log/slurm/slurmd.log
 | Node `inval` | `CPUs`/`RealMemory` in `slurm.conf` higher than `slurmd -C` reports. Lower them, copy to both nodes, restart daemons |
 | `Invalid generic resource (gres) specification` | `gres.conf` missing on the Jetson, or `GresTypes=gpu` missing in `slurm.conf` |
 | Node `inval`, `sinfo -R` says `gres/gpu count reported lower` | `gres.conf` has no `File=`. Slurm ignores file-less GPUs (`slurmd -G` → *Ignoring file-less GPU*). Use `File=/dev/nvidia0`, restart slurmd, then `scontrol update nodename=orin-node01 state=resume` |
+| GPU job fails: `NvRmMemInitNvmap failed: Permission denied`, `No devices were found` | Job ran without the Jetson's `video`/`render` groups (Slurm 23.11 sends the controller's group list). Add `LaunchParameters=disable_send_gids` to `slurm.conf` on both nodes, restart both daemons. Check with `srun id` |
 | `sudo: a terminal is required` over SSH | Use `ssh -t orin-node01 'sudo …'` |
 | Jetson `id` shows a UID other than 1000 | Change it from a temporary admin with a fixed UID (e.g. 1500): `groupmod -g 1000 leecluster && usermod -u 1000 -g 1000 leecluster`, then chown leftover files |
 | Job fails with permission/user errors | `leecluster` UID differs between nodes (`id` on both) |
