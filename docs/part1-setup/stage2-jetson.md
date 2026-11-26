@@ -4,6 +4,27 @@ JetPack 7.2 brought the Orin family onto **Ubuntu 24.04 / kernel 6.8 / CUDA 13**
 
 > **No SD-card image any more.** From JetPack 7.2, the Orin Nano dev kit is installed with the **Jetson ISO** written to a **USB stick**, which then installs onto NVMe (or microSD). Don't write the ISO to the microSD.
 
+## 2.0 Already flashed? Check before reflashing
+
+If the Jetson already boots into Ubuntu, log in and run:
+
+```bash
+cat /etc/nv_tegra_release    # JetPack / Jetson Linux version
+lsb_release -ds              # Ubuntu version
+hostname; id                 # name + user/UID
+```
+
+| You see | Meaning | Do this |
+|---|---|---|
+| `R39 (release), REVISION: 2.x` + Ubuntu 24.04 | JetPack 7.2.x ✅ matches the Pi | **Skip to [2.4](#24-verify-update-install-packages)** (fix user/hostname first, see below) |
+| `R36 ...` + Ubuntu 22.04 | JetPack 6.x ❌ (Slurm 21.08, too old for the Pi's 23.11) | Reflash: firmware is already new enough, **go straight to 2.2** |
+| `R35 ...` or lower + Ubuntu 20.04 | JetPack 5.x ❌ | Reflash: **start at 2.1** (firmware update needed) |
+
+Even on R39, check the user and hostname:
+
+- `id` must show **`uid=1000(leecluster)`**, the same as the Pi. If the first user has a different name, reflashing is the cleanest fix.
+- Wrong hostname is an easy fix: `sudo hostnamectl set-hostname orin-node01`
+
 ## 2.1 Check the firmware first
 
 JetPack 7.2 needs **JetPack 6-generation UEFI/QSPI firmware (36.x or newer)** on the board.
