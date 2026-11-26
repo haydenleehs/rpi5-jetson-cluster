@@ -16,13 +16,15 @@ Flash each board, get it online, and install every package the cluster needs **w
 - [ ] `id` → `uid=1000(leecluster)`
 - [ ] `ip -br addr show wlan0` → **UP with an IP** (Wi-Fi is the Pi's only internet after Part 2)
 - [ ] `ssh leecluster@rpi5-login` works from the laptop over Tailscale
-- [ ] `sinfo -V` → slurm 23.11.x
+- [ ] `slurmctld -V` → slurm 23.11.x
 - [ ] Repo cloned to `~/rpi5-jetson-cluster`
 
 **Jetson (`orin-node01`)**
 
 - [ ] `cat /etc/nv_tegra_release` → R39, REVISION 2.x
-- [ ] `id` → `uid=1000(leecluster)`
+- [ ] `id` → `uid=1000(leecluster)` (pre-flashed board? see Stage 2.0b)
+- [ ] `hostname` → `orin-node01`
+- [ ] `timedatectl` → correct year, *synchronized: yes*
 - [ ] `nvidia-smi` and `/usr/local/cuda/bin/nvcc --version` work
 - [ ] `slurmd -V` → slurm 23.11.x
 - [ ] Boots to text console (`multi-user.target`)

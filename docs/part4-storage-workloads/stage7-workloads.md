@@ -11,6 +11,16 @@ git clone https://github.com/haydenleehs/rpi5-jetson-cluster.git
 cd rpi5-jetson-cluster/workloads
 ```
 
+Check the Jetson has what the jobs need:
+
+```bash
+srun python3 -c "import mpi4py, numpy; print('mpi4py ok')"
+srun ls /usr/local/cuda/bin/nvcc
+# missing? ssh -t orin-node01 'sudo apt install -y nvidia-jetpack openmpi-bin python3-mpi4py python3-numpy'
+```
+
+> **`squeue` shows `(InvalidAccount)`?** It's only a label. With accounting switched off, Slurm 23.11 tags newly queued jobs `InvalidAccount` until the scheduler picks them up (up to ~30 s). The job still runs; check `scontrol show job <id> | grep JobState`. A job that is really stuck shows a node in `drain`/`down` in `sinfo`.
+
 ## 7.2 CPU — MPI + Python
 
 [`mc_pi.py`](../../workloads/mc_pi.py) splits the samples across MPI ranks and reduces the hit count on rank 0.

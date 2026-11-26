@@ -65,6 +65,18 @@ Each Part ends with a ✅ checkpoint. Don't move on until every box is ticked.
 
 **[Troubleshooting](docs/troubleshooting.md)**: Wi-Fi, SSH, Slurm and NFS fixes, including problems hit during this build.
 
+## Gotchas found during the build
+
+These caught us during the first build. Each one is covered in its stage and in [Troubleshooting](docs/troubleshooting.md).
+
+| Stage | Gotcha |
+|---|---|
+| 2 | Pre-flashed Jetson: wrong-year clock breaks `apt`; user `jetson` with UID 2002 must become `leecluster` with UID 1000 |
+| 3 | Pi's cloud-init rewrites `/etc/hosts` at boot; disable it. Jetson NIC is `enP8p1s0` |
+| 5 | `gres.conf` needs `File=/dev/nvidia0`, since Slurm ignores file-less GPUs |
+| 5 | `LaunchParameters=disable_send_gids`, otherwise GPU jobs lack the Jetson's `video` group |
+| 7 | `(InvalidAccount)` in `squeue` is cosmetic with accounting off |
+
 ## Names used throughout
 
 | Item | Value |

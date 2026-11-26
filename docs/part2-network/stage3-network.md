@@ -41,24 +41,48 @@ sudo sysctl --system
 sudo iptables -t nat -A POSTROUTING -o wlan0 -j MASQUERADE
 sudo iptables -A FORWARD -i eth0 -o wlan0 -j ACCEPT
 sudo iptables -A FORWARD -i wlan0 -o eth0 -m state --state RELATED,ESTABLISHED -j ACCEPT
-sudo netfilter-persistent save
+sudo netfilter-persistent save        # "command not found"? sudo apt install -y iptables-persistent (answer Yes to save IPv4 rules)
+```
+
+Check:
+
+```bash
+sudo iptables -t nat -L POSTROUTING -n -v   # MASQUERADE with out = wlan0 (ts-postrouting is Tailscale's, leave it)
+sysctl net.ipv4.ip_forward                  # = 1
 ```
 
 ## 3.3 Jetson — static IP
 
-The Jetson uses **NetworkManager**, not netplan. Find the Ethernet interface name first (often `enP8p1s0`, not `eth0`):
+The Jetson has no cluster IP yet, but you can still reach it **from the Pi over the cable**:
+
+```bash
+ssh leecluster@orin-node01.local            # mDNS (works with the Jetson's Ubuntu desktop image)
+# or find its IPv6 link-local address:
+ping -6 -c 2 ff02::1%eth0                   # the fe80:: address that isn't the Pi's
+ssh leecluster@fe80::xxxx:xxxx:xxxx:xxxx%eth0
+```
+
+(Or use the Jetson's own keyboard + monitor.)
+
+The Jetson uses **NetworkManager**, not netplan. Find the Ethernet interface name. On the Orin Nano dev kit it's **`enP8p1s0`**. Ignore `wlP1p1s0` (Wi-Fi), `can0`, `l4tbr0`, `usb0/1` and `docker0`.
 
 ```bash
 ip -br link
-sudo nmcli con add type ethernet ifname <IFACE> con-name cluster \
+sudo nmcli con add type ethernet ifname enP8p1s0 con-name cluster \
   ipv4.method manual ipv4.addresses 10.0.0.11/24 \
   ipv4.gateway 10.0.0.1 ipv4.dns "1.1.1.1 8.8.8.8" ipv6.method disabled
 sudo nmcli con up cluster
 ```
 
+Your SSH session **will freeze or drop** at `nmcli con up` (it disables the IPv6 address you came in on). Wait ~10 s, then reconnect on the new IP:
+
+```bash
+ssh leecluster@10.0.0.11
+```
+
 If an old *"Wired connection 1"* keeps grabbing the port: `sudo nmcli con delete "Wired connection 1"`.
 
-Turn off the Jetson's Wi-Fi so all traffic goes through the Pi:
+Turn off the Jetson's Wi-Fi so all traffic goes through the Pi. Do this **after** reconnecting on 10.0.0.11, because your session may be running over Wi-Fi:
 
 ```bash
 sudo nmcli radio wifi off
@@ -66,14 +90,33 @@ sudo nmcli radio wifi off
 
 ## 3.4 Both — /etc/hosts
 
-Add to `/etc/hosts` on **both** nodes ([`configs/pi5/hosts-cluster`](../../configs/pi5/hosts-cluster)):
+> ⚠️ On the Pi, `/etc/hosts` starts with *"Your system has configured 'manage_etc_hosts' as True"*: cloud-init **rewrites it at every boot**. Disable cloud-init first or your changes vanish.
+
+**Pi:**
+
+```bash
+sudo touch /etc/cloud/cloud-init.disabled
+sudo sed -i 's/^127.0.1.1/#127.0.1.1/' /etc/hosts
+echo -e "10.0.0.1   rpi5-login\n10.0.0.11  orin-node01" | sudo tee -a /etc/hosts
+getent hosts orin-node01      # 10.0.0.11  orin-node01
+```
+
+**Jetson** (`ssh leecluster@10.0.0.11`):
+
+```bash
+sudo sed -i 's/^127.0.1.1/#127.0.1.1/' /etc/hosts
+echo -e "10.0.0.1   rpi5-login\n10.0.0.11  orin-node01" | sudo tee -a /etc/hosts
+cat /etc/hosts
+```
+
+Both should end up with ([`configs/pi5/hosts-cluster`](../../configs/pi5/hosts-cluster)):
 
 ```
-10.0.0.1   rpi5-login
-10.0.0.11  orin-node01
+127.0.0.1   localhost
+#127.0.1.1  ...            (commented out, or absent)
+10.0.0.1    rpi5-login
+10.0.0.11   orin-node01
 ```
-
-Also **comment out the `127.0.1.1 <hostname>` line** on each node, so the node's own name resolves to its cluster IP.
 
 ## 3.5 Test
 

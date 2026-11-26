@@ -20,10 +20,78 @@ hostname; id                 # name + user/UID
 | `R36 ...` + Ubuntu 22.04 | JetPack 6.x ❌ (Slurm 21.08, too old for the Pi's 23.11) | Reflash: firmware is already new enough, **go straight to 2.2** |
 | `R35 ...` or lower + Ubuntu 20.04 | JetPack 5.x ❌ | Reflash: **start at 2.1** (firmware update needed) |
 
-Even on R39, check the user and hostname:
+Even on R39, check the user, hostname and clock. A board that came **pre-flashed** (e.g. user `jetson`, hostname `localhost.localdomain`) needs the fixes in 2.0a–2.0c before 2.4.
 
-- `id` must show **`uid=1000(leecluster)`**, the same as the Pi. If the first user has a different name, reflashing is the cleanest fix.
-- Wrong hostname is an easy fix: `sudo hostnamectl set-hostname orin-node01`
+### 2.0a Fix the clock (pre-flashed boards often boot in the wrong year)
+
+Symptoms: `apt update` fails with *"Release file … is not valid yet (invalid for another 20783d)"* and *"certificate … not yet valid"*.
+
+```bash
+date                                     # wrong year?
+sudo timedatectl set-ntp true
+sudo systemctl restart systemd-timesyncd
+sleep 15; timedatectl                    # System clock synchronized: yes
+# still wrong? set it by hand:
+#   sudo timedatectl set-ntp false; sudo date -s "2026-11-26 20:10:00"; sudo timedatectl set-ntp true
+sudo hwclock -w                          # save to the hardware clock
+```
+
+### 2.0b Rename the user to `leecluster` with UID 1000
+
+`id` must show **`uid=1000(leecluster)`**, exactly like the Pi (Slurm runs jobs by UID; NFS owns files by UID).
+
+You can't rename or re-UID a user while logged in as it, so use a **temporary admin with a fixed UID of 1500**. Don't use plain `adduser`: it takes the first free ID, which may be the 1000 you need.
+
+```bash
+# as the old user (e.g. jetson)
+sudo groupadd -g 1500 tempfix
+sudo useradd -m -u 1500 -g 1500 -G sudo -s /bin/bash tempfix
+sudo passwd tempfix
+sudo reboot
+```
+
+Log in as **`tempfix`** (on the Jetson's own keyboard, or `ssh tempfix@<jetson-ip>`):
+
+```bash
+OLD=jetson                                    # the pre-flashed username
+OLDUID=$(id -u $OLD)                          # e.g. 1000 or 2002
+sudo systemctl isolate multi-user.target      # stop the desktop session
+sudo pkill -u $OLD; sleep 2
+
+sudo usermod -l leecluster -d /home/leecluster -m $OLD
+sudo groupmod -n leecluster $OLD
+sudo chfn -f "leecluster" leecluster          # login-screen display name
+
+# move to UID/GID 1000 if it isn't already
+if [ "$OLDUID" != 1000 ]; then
+  getent passwd 1000 && echo "STOP: UID 1000 is taken"      # must print nothing
+  getent group 1000  && echo "STOP: GID 1000 is taken"      # must print nothing
+  sudo groupmod -g 1000 leecluster
+  sudo usermod -u 1000 -g 1000 leecluster                   # also re-owns /home/leecluster
+  sudo find / -xdev -uid $OLDUID -exec chown -h 1000 {} + 2>/dev/null
+  sudo find / -xdev -gid $OLDUID -exec chgrp -h 1000 {} + 2>/dev/null
+fi
+
+id leecluster                                 # uid=1000(leecluster) gid=1000(leecluster)
+sudo reboot
+```
+
+Log in as `leecluster`, then remove the temp user and check auto-login:
+
+```bash
+sudo userdel -r tempfix
+grep -i AutomaticLogin /etc/gdm3/custom.conf  # if it names the old user, change it to leecluster
+```
+
+The password stays the old user's password (change with `passwd`). It doesn't need to match the Pi; only the **username and UID** must.
+
+### 2.0c Fix the hostname
+
+```bash
+sudo hostnamectl set-hostname orin-node01
+sudo sed -i 's/localhost.localdomain/orin-node01/g' /etc/hosts
+hostname                                      # orin-node01
+```
 
 ## 2.1 Check the firmware first
 
@@ -61,27 +129,37 @@ JetPack 7.2 needs **JetPack 6-generation UEFI/QSPI firmware (36.x or newer)** on
 
 Do the big downloads **now**, using the Jetson's own Wi-Fi/Ethernet. After Stage 3 it gets internet through the Pi.
 
+Connect to Wi-Fi if needed (home Wi-Fi or hotspot; not eduroam):
+
+```bash
+nmcli dev wifi list
+sudo nmcli dev wifi connect "YOUR_SSID" password "YOUR_WIFI_PASSWORD"
+ping -c 3 google.com
+```
+
 ```bash
 cat /etc/nv_tegra_release           # R39 (release), REVISION: 2.x
 id                                  # uid=1000(leecluster)
 
-sudo apt update && sudo apt full-upgrade -y
+sudo apt update && sudo apt full-upgrade -y   # must finish with no "E:" lines (if it does: 2.0a clock)
 sudo apt install -y nvidia-jetpack  # CUDA, cuDNN, TensorRT (several GB)
 sudo apt install -y munge slurmd slurm-client nfs-common \
   openmpi-bin libopenmpi-dev python3-mpi4py python3-numpy
 sudo timedatectl set-timezone Asia/Singapore
+slurmd -V                           # slurm 23.11.x
 ```
 
 ## 2.5 Tune it as a compute node
 
 ```bash
 sudo nvpmodel -q                                # current power mode
-# pick MAXN SUPER: GUI power menu, or `sudo nvpmodel -m <id>` (ids listed in /etc/nvpmodel.conf)
+grep -n "POWER_MODEL" /etc/nvpmodel.conf       # find the MAXN SUPER id
+sudo nvpmodel -m <id>
 sudo systemctl set-default multi-user.target    # boot headless, frees ~1 GB RAM
 sudo reboot
 ```
 
-Check the GPU after reboot:
+After the reboot the Jetson shows a **text login** instead of the desktop. That's expected. Check the GPU:
 
 ```bash
 nvidia-smi
