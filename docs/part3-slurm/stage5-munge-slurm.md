@@ -59,19 +59,26 @@ ssh -t orin-node01 'sudo mv /tmp/slurm.conf /etc/slurm/slurm.conf'
 
 ## 5.5 gres.conf (Jetson only)
 
+Slurm **ignores a GPU entry that has no device file** (`slurmd -G` prints *"Ignoring file-less GPU"* and the node goes `inval`). Point it at the Jetson's GPU device:
+
+```bash
+ssh orin-node01 ls -l /dev/nvidia0        # JetPack 7.2: GPU device file
+```
+
 ```bash
 # on the Pi
 scp ~/rpi5-jetson-cluster/configs/jetson/gres.conf orin-node01:/tmp/
 ssh -t orin-node01 'sudo mv /tmp/gres.conf /etc/slurm/gres.conf'
+ssh -t orin-node01 'sudo slurmd -G'       # should show Name=gpu ... File=/dev/nvidia0
 ```
 
 It contains ([`configs/jetson/gres.conf`](../../configs/jetson/gres.conf)):
 
 ```
-NodeName=orin-node01 Name=gpu Count=1
+NodeName=orin-node01 Name=gpu File=/dev/nvidia0
 ```
 
-> This makes Slurm *count* the GPU so jobs can request `--gres=gpu:1`. It doesn't isolate the device, which is fine with one node.
+> If `/dev/nvidia0` doesn't exist on your board, use `/dev/nvhost-gpu` instead.
 
 ## 5.6 Start the daemons
 
